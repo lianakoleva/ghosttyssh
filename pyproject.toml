@@ -1,0 +1,15 @@
+[project]
+name = "ghosttyssh"
+version = "0.1.0"
+description = "Ghostty-aware SSH wrapper"
+dependencies = [
+    "textual",
+    "rich"
+]
+
+[project.scripts]
+ghosttyssh = "ghosttyssh:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"

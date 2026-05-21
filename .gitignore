@@ -1,0 +1,3 @@
+.venv
+build/
+ghosttyssh.egg-info/
