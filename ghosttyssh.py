@@ -145,7 +145,11 @@ class Picker:
             """
 
             BINDINGS = [
-                ("q", "quit", "Quit"),
+                ("q",           "quit", "Quit"),
+                *[
+                    (str(d), f"select({d})", f"Select #{d}")
+                    for d in range(10)
+                ],
             ]
 
             def compose(self):
@@ -154,8 +158,8 @@ class Picker:
                 with Container(id="box"):
                     yield ListView(
                         *[
-                            ListItem(Label(f"{host.name}    {host.target}"))
-                            for host in hosts
+                            ListItem(Label(f" [{i}]   {host.name}    {host.target}"))
+                            for i, host in enumerate(hosts)
                         ]
                     )
 
@@ -165,6 +169,12 @@ class Picker:
                 idx = event.list_view.index
                 selected["target"] = hosts[idx].target
                 self.exit()
+
+            def action_select(self, digit: int) -> None:
+                """Select host by digit shortcut (0-9)."""
+                if digit < len(hosts):
+                    selected["target"] = hosts[digit].target
+                    self.exit()
 
         app = HostPicker()
         app.run()
