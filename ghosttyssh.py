@@ -87,13 +87,16 @@ def ensure_ghostty_terminfo(target: str):
         sys.exit(result.returncode)
 
 
-def ssh_into_host(target: str):
+def ssh_into_host(target: str, friendly_name: str = ""):
     env = os.environ.copy()
 
     # Use a minimal TERM that defines the backspace key (kbs) but lacks
     # mouse-reporting (kmous) so we don't get escape-sequence spam when
     # the mouse moves.  vt220 is universally available on remote hosts.
     env["TERM"] = "vt220"
+
+    if friendly_name:
+        print(f"\033]0;{friendly_name}\007", end="", flush=True)
 
     print(f"\n→ Connecting to {target}\n")
 
@@ -320,8 +323,13 @@ def main():
 
     maybe_save_host(target)
 
+    friendly_name = ""
+    host = store.find_by_target(target)
+    if host:
+        friendly_name = host.name
+
     ensure_ghostty_terminfo(target)
-    ssh_into_host(target)
+    ssh_into_host(target, friendly_name)
 
 
 if __name__ == "__main__":
