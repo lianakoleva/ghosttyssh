@@ -111,10 +111,14 @@ class Picker:
     def run(self) -> Optional[str]:
         try:
             from textual.app import App, ComposeResult
+            from textual.binding import Binding
             from textual.containers import Container
+            from textual.screen import ModalScreen
             from textual.widgets import (
+                Button,
                 Footer,
                 Header,
+                Input,
                 Label,
                 ListItem,
                 ListView,
@@ -124,8 +128,82 @@ class Picker:
             print("  pip install textual rich")
             sys.exit(1)
 
+        class AddHostScreen(ModalScreen[str]):
+            """Modal screen to add a new host connection."""
+
+            BINDINGS = [("escape", "cancel", "Cancel")]
+
+            DEFAULT_CSS = """
+            AddHostScreen {
+                align: center middle;
+            }
+
+            #add-dialog {
+                width: 60;
+                height: auto;
+                border: thick $accent;
+                background: $surface;
+                padding: 1 2;
+            }
+
+            #add-dialog Label {
+                width: 100%;
+                margin: 1 0 0 0;
+            }
+
+            #add-dialog Input {
+                width: 100%;
+                margin: 0 0 1 0;
+            }
+
+            #add-dialog #btn-row {
+                width: 100%;
+                align: right middle;
+                height: 3;
+                margin: 1 0 0 0;
+            }
+
+            #add-dialog Button {
+                margin: 0 0 0 1;
+            }
+            """
+
+            def compose(self):
+                with Container(id="add-dialog"):
+                    yield Label("[bold]Target:[/bold]  (e.g. user@host)")
+                    yield Input(placeholder="SSH target", id="target-input")
+                    yield Label("[bold]Friendly Name:[/bold]  (optional)")
+                    yield Input(placeholder="My Server", id="name-input")
+                    with Container(id="btn-row"):
+                        yield Button("Cancel", variant="default", id="cancel-btn")
+                        yield Button("[bold]Add[/bold]", variant="primary", id="add-btn")
+
+            def action_cancel(self):
+                self.dismiss("")
+
+            def on_button_pressed(self, event: Button.Pressed):
+                if event.button.id == "add-btn":
+                    target = self.query_one("#target-input", Input).value.strip()
+                    name = self.query_one("#name-input", Input).value.strip()
+                    if target:
+                        if not name:
+                            name = target
+                        self.dismiss(json.dumps({"target": target, "name": name}))
+                    else:
+                        self.notify("Target is required.", severity="error")
+                else:
+                    self.dismiss("")
+
         selected = {"target": None}
         hosts = self.hosts
+        store_ref = store
+
+        def rebuild_listview(app: App, hosts_list: List[Host]):
+            """Replace the ListView with an updated host list."""
+            lv = app.query_one(ListView)
+            lv.clear()
+            for i, host in enumerate(hosts_list):
+                lv.append(ListItem(Label(f" [{i}]   {host.name}    {host.target}")))
 
         class HostPicker(App):
             CSS = """
@@ -145,9 +223,11 @@ class Picker:
             """
 
             BINDINGS = [
-                ("q",           "quit", "Quit"),
+                Binding("q", "quit", "Quit"),
+                Binding("ctrl+c", "quit", "Quit", show=False),
+                Binding("a", "add", "Add Host"),
                 *[
-                    (str(d), f"select({d})", f"Select #{d}")
+                    Binding(str(d), f"select({d})", f"Select #{d}", show=False)
                     for d in range(10)
                 ],
             ]
@@ -165,6 +245,10 @@ class Picker:
 
                 yield Footer()
 
+            def on_mount(self) -> None:
+                if not hosts:
+                    self.push_screen(AddHostScreen(), self._add_callback)
+
             def on_list_view_selected(self, event):
                 idx = event.list_view.index
                 selected["target"] = hosts[idx].target
@@ -175,6 +259,27 @@ class Picker:
                 if digit < len(hosts):
                     selected["target"] = hosts[digit].target
                     self.exit()
+
+            def action_add(self) -> None:
+                """Open modal to add a new host."""
+                self.push_screen(AddHostScreen(), self._add_callback)
+
+            def _add_callback(self, data: str | None):
+                if not data:
+                    return
+                try:
+                    info = json.loads(data)
+                except Exception:
+                    return
+                new_host = Host(name=info["name"], target=info["target"])
+                store_ref.add(new_host)
+                hosts.clear()
+                hosts.extend(store_ref.load())
+                self.notify(
+                    f"Added [bold]{info['name']}[/bold] → {info['target']}",
+                    title="Host saved",
+                )
+                rebuild_listview(self, hosts)
 
         app = HostPicker()
         app.run()
@@ -208,13 +313,6 @@ def main():
 
     if not target:
         hosts = store.load()
-
-        if not hosts:
-            print("No saved hosts.")
-            print("Usage:")
-            print("  ghosttyssh ssh yourhost")
-            sys.exit(1)
-
         target = Picker(hosts).run()
 
         if not target:
