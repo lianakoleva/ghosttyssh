@@ -178,8 +178,8 @@ class Picker:
                     yield Label("[bold]Friendly Name:[/bold]  (optional)")
                     yield Input(placeholder="My Server", id="name-input")
                     with Container(id="btn-row"):
-                        yield Button("Cancel", variant="default", id="cancel-btn")
                         yield Button("[bold]Add[/bold]", variant="primary", id="add-btn")
+                        yield Button("Cancel", variant="default", id="cancel-btn")
 
             def action_cancel(self):
                 self.dismiss("")
@@ -244,8 +244,8 @@ class Picker:
                         f"Target: [bold]{self.host.target}[/bold]"
                     )
                     with Container(id="btn-row"):
-                        yield Button("Cancel", variant="default", id="cancel-btn")
                         yield Button("[bold]Delete[/bold]", variant="error", id="delete-btn")
+                        yield Button("Cancel", variant="default", id="cancel-btn")
 
             def action_cancel_delete(self):
                 self.dismiss(False)
