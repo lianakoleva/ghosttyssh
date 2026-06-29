@@ -197,6 +197,65 @@ class Picker:
                 else:
                     self.dismiss("")
 
+        class ConfirmDeleteScreen(ModalScreen[bool]):
+            """Modal screen to confirm host deletion."""
+
+            BINDINGS = [("escape", "cancel_delete", "Cancel")]
+
+            DEFAULT_CSS = """
+            ConfirmDeleteScreen {
+                align: center middle;
+            }
+
+            #delete-dialog {
+                width: 50;
+                height: auto;
+                border: thick $error;
+                background: $surface;
+                padding: 1 2;
+            }
+
+            #delete-dialog Label {
+                width: 100%;
+                margin: 1 0;
+            }
+
+            #delete-dialog #btn-row {
+                width: 100%;
+                align: right middle;
+                height: auto;
+                margin: 1 0 0 0;
+            }
+
+            #delete-dialog Button {
+                margin: 0 0 0 1;
+            }
+            """
+
+            def __init__(self, host: Host):
+                super().__init__()
+                self.host = host
+
+            def compose(self):
+                with Container(id="delete-dialog"):
+                    yield Label(
+                        f"[bold]Delete host?[/bold]\n\n"
+                        f"Name:   [bold]{self.host.name}[/bold]\n"
+                        f"Target: [bold]{self.host.target}[/bold]"
+                    )
+                    with Container(id="btn-row"):
+                        yield Button("Cancel", variant="default", id="cancel-btn")
+                        yield Button("[bold]Delete[/bold]", variant="error", id="delete-btn")
+
+            def action_cancel_delete(self):
+                self.dismiss(False)
+
+            def on_button_pressed(self, event: Button.Pressed):
+                if event.button.id == "delete-btn":
+                    self.dismiss(True)
+                else:
+                    self.dismiss(False)
+
         selected = {"target": None}
         hosts = self.hosts
         store_ref = store
@@ -229,6 +288,7 @@ class Picker:
                 Binding("q", "quit", "Quit"),
                 Binding("ctrl+c", "quit", "Quit", show=False),
                 Binding("a", "add", "Add Host"),
+                Binding("d", "delete", "Delete Host"),
                 *[
                     Binding(str(d), f"select({d})", f"Select #{d}", show=False)
                     for d in range(10)
@@ -266,6 +326,33 @@ class Picker:
             def action_add(self) -> None:
                 """Open modal to add a new host."""
                 self.push_screen(AddHostScreen(), self._add_callback)
+
+            def action_delete(self) -> None:
+                """Delete the currently highlighted host."""
+                lv = self.query_one(ListView)
+                if lv.index is None or not hosts:
+                    self.notify("No host selected.", severity="warning")
+                    return
+                idx = lv.index
+                host_to_delete = hosts[idx]
+                # Confirm deletion
+                self.push_screen(
+                    ConfirmDeleteScreen(host_to_delete),
+                    lambda confirmed: self._delete_callback(idx, confirmed),
+                )
+
+            def _delete_callback(self, idx: int, confirmed: bool):
+                if not confirmed:
+                    return
+                host_name = hosts[idx].name
+                host_target = hosts[idx].target
+                del hosts[idx]
+                store_ref.save(list(hosts))
+                self.notify(
+                    f"Deleted [bold]{host_name}[/bold] ({host_target})",
+                    title="Host deleted",
+                )
+                rebuild_listview(self, hosts)
 
             def _add_callback(self, data: str | None):
                 if not data:
