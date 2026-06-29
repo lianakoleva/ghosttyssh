@@ -162,7 +162,7 @@ class Picker:
             #add-dialog #btn-row {
                 width: 100%;
                 align: right middle;
-                height: 3;
+                height: auto;
                 margin: 1 0 0 0;
             }
 
